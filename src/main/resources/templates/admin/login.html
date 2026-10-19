@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ndema - Admin Portal Login</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-dark text-light d-flex align-items-center min-vh-100 py-5">
+<div class="container" style="max-width: 420px;">
+    <div class="card bg-secondary text-white shadow-lg p-4 border-0 rounded-4">
+        <h2 class="text-center text-warning fw-bold mb-1">🔐 Ndema Admin</h2>
+        <p class="text-center text-light small mb-4">Official Municipal Dispatch & Audit Portal</p>
+
+        <div th:if="${error}" class="alert alert-danger py-2 small text-center" th:text="${error}"></div>
+
+        <form th:action="@{/admin/login}" method="post">
+            <div class="mb-3">
+                <label class="form-label fw-bold">Username</label>
+                <input type="text" name="username" class="form-control bg-dark text-white border-secondary" placeholder="e.g. main_admin" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-bold">Password</label>
+                <input type="password" name="password" class="form-control bg-dark text-white border-secondary" required>
+            </div>
+            <div class="mb-4">
+                <label class="form-label fw-bold">Security Access Code</label>
+                <input type="text" name="accessCode" class="form-control bg-dark text-white border-secondary" placeholder="e.g. 9900" required>
+            </div>
+            <button type="submit" class="btn btn-warning w-100 fw-bold py-2 shadow-sm">Authorize &amp; Enter Dashboard</button>
+        </form>
+        <a href="/" class="btn btn-link text-light text-decoration-none text-center mt-3 small">&larr; Return to Public Home</a>
+    </div>
+</div>
+</body>
+</html>
