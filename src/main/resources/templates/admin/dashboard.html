@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ndema - Officer Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light py-4">
+<div class="container-fluid px-4">
+
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+        <div>
+            <h2 class="fw-bold mb-0 text-dark">Ndema — Officer Dashboard</h2>
+            <small class="text-muted">
+                Signed in as <strong th:text="${currentAdmin.fullName}"></strong>
+                <span class="badge bg-danger ms-1" th:if="${currentAdmin.superAdmin}">Super Admin</span>
+            </small>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+            <a th:href="@{/admin/audit}" class="btn btn-dark fw-semibold">📜 Audit History</a>
+            <a th:if="${currentAdmin.superAdmin}" th:href="@{/admin/users}" class="btn btn-primary fw-semibold">👥 Add / Remove Admins</a>
+            <a th:href="@{/}" class="btn btn-outline-secondary fw-semibold">Home</a>
+            <a th:href="@{/admin/logout}" class="btn btn-outline-danger fw-semibold">Sign Out</a>
+        </div>
+    </div>
+
+    <div th:if="${msg}" class="alert alert-success py-2" th:text="${msg}"></div>
+    <div th:if="${err}" class="alert alert-danger py-2" th:text="${err}"></div>
+
+    <!-- Summary Stat Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm p-3 border-start border-danger border-4 rounded-4 bg-white">
+                <span class="text-muted fw-bold small text-uppercase">Critical Priority</span>
+                <h3 class="fw-bold text-danger my-1" th:text="${criticalCount}">0</h3>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm p-3 border-start border-warning border-4 rounded-4 bg-white">
+                <span class="text-muted fw-bold small text-uppercase">High / Action Required</span>
+                <h3 class="fw-bold text-dark my-1" th:text="${highCount}">0</h3>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm p-3 border-start border-primary border-4 rounded-4 bg-white">
+                <span class="text-muted fw-bold small text-uppercase">In Progress</span>
+                <h3 class="fw-bold text-primary my-1" th:text="${inProgressCount}">0</h3>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm p-3 border-start border-success border-4 rounded-4 bg-white">
+                <span class="text-muted fw-bold small text-uppercase">Resolved Cases</span>
+                <h3 class="fw-bold text-success my-1" th:text="${resolvedCount}">0</h3>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search, filter and sort -->
+    <div class="card border-0 shadow-sm rounded-4 mb-4 p-3 bg-white">
+        <div class="row g-2">
+            <div class="col-lg-6">
+                <input type="text" id="searchInput" onkeyup="filterTable()" class="form-control form-control-lg"
+                       placeholder="🔍 Search tracking code, LGA, keyword, title...">
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <select id="categoryFilter" onchange="filterTable()" class="form-select form-select-lg">
+                    <option value="">All Categories</option>
+                    <option th:each="cat : ${T(gm.ndema.model.Enums.Category).values()}" th:value="${cat}" th:text="${cat}"></option>
+                </select>
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <form th:action="@{/admin/dashboard}" method="get" class="m-0">
+                    <select name="sort" onchange="this.form.submit()" class="form-select form-select-lg" title="Sort reports">
+                        <option value="urgency" th:selected="${sort == 'urgency'}">Sort: Most critical first</option>
+                        <option value="newest" th:selected="${sort == 'newest'}">Sort: Newest first</option>
+                        <option value="oldest" th:selected="${sort == 'oldest'}">Sort: Oldest first</option>
+                        <option value="status" th:selected="${sort == 'status'}">Sort: Open cases first</option>
+                        <option value="confirmations" th:selected="${sort == 'confirmations'}">Sort: Most confirmed</option>
+                    </select>
+                </form>
+            </div>
+        </div>
+        <small class="text-muted mt-2">Reports from the same area (LGA) and category are grouped together. Tick several in a group to update them at once.</small>
+    </div>
+
+    <!-- Grouped reports -->
+    <div th:each="g, gi : ${groups}" class="card border-0 shadow-sm rounded-4 mb-4 group-card">
+        <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center flex-wrap gap-2 rounded-top-4 py-3">
+            <div>
+                <span class="fw-bold fs-5" th:text="${g.lga}"></span>
+                <span class="mx-1">·</span>
+                <span th:text="${g.category}"></span>
+                <span class="badge bg-secondary ms-2" th:text="${g.complaints.size() + (g.complaints.size() == 1 ? ' report' : ' reports')}"></span>
+            </div>
+
+            <!-- Bulk edit (only when a group has more than one report) -->
+            <form th:if="${g.complaints.size() > 1}" th:id="'bulk-' + ${gi.index}" th:action="@{/admin/complaints/bulk}" method="post"
+                  class="d-flex gap-2 align-items-center flex-wrap m-0">
+                <label class="small d-flex align-items-center gap-1 m-0">
+                    <input type="checkbox" class="form-check-input m-0" th:data-group="${gi.index}" onclick="toggleGroup(this)"> Select all
+                </label>
+                <select name="urgency" class="form-select form-select-sm w-auto">
+                    <option value="">Urgency: no change</option>
+                    <option th:each="u : ${T(gm.ndema.model.Enums.Urgency).values()}" th:value="${u}" th:text="${'Set ' + u}"></option>
+                </select>
+                <select name="status" class="form-select form-select-sm w-auto">
+                    <option value="">Status: no change</option>
+                    <option th:each="st : ${T(gm.ndema.model.Enums.Status).values()}" th:value="${st}" th:text="${'Set ' + st}"></option>
+                </select>
+                <button type="submit" class="btn btn-sm btn-warning fw-semibold">Apply to ticked</button>
+            </form>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 report-table">
+                <thead class="table-light">
+                <tr>
+                    <th class="ps-3" style="width: 40px;"></th>
+                    <th>Urgency</th>
+                    <th>Tracking Code</th>
+                    <th>Title</th>
+                    <th>Institution</th>
+                    <th>Status</th>
+                    <th>Voice</th>
+                    <th class="pe-3 text-end">Details / Edit</th>
+                </tr>
+                </thead>
+                <tbody>
+                <th:block th:each="c : ${g.complaints}">
+                    <tr class="complaint-row" th:data-category="${c.category}"
+                        th:data-search="${c.trackingCode + ' ' + c.title + ' ' + c.description + ' ' + c.lga + ' ' + c.category + ' ' + c.status + ' ' + c.urgencyLevel}">
+                        <td class="ps-3">
+                            <input th:if="${g.complaints.size() > 1}" type="checkbox" name="ids" th:value="${c.id}"
+                                   th:attr="form=${'bulk-' + gi.index}" th:data-group="${gi.index}" class="form-check-input row-check">
+                        </td>
+                        <td class="text-nowrap">
+                            <span class="badge"
+                                  th:classappend="${c.urgencyLevel == null ? 'bg-secondary' : (c.urgencyLevel.name() == 'CRITICAL' ? 'bg-danger' : (c.urgencyLevel.name() == 'HIGH' ? 'bg-warning text-dark' : (c.urgencyLevel.name() == 'MEDIUM' ? 'bg-info text-dark' : 'bg-secondary')))}"
+                                  th:text="${c.urgencyLevel}"></span>
+                            <small class="text-muted ms-1" th:text="'(' + ${c.urgencyScore} + ' pts)'"></small>
+                            <span th:if="${c.urgencyOverridden}" class="badge bg-light text-dark border ms-1" title="Urgency set manually by an admin">✎</span>
+                        </td>
+                        <td class="fw-bold text-primary text-nowrap" th:text="${c.trackingCode}"></td>
+                        <td class="fw-semibold text-dark" style="max-width: 260px;" th:text="${c.title}"></td>
+                        <td><span class="badge bg-light text-dark border" th:text="${c.institution != null ? c.institution.shortName : 'Unassigned'}"></span></td>
+                        <td><span class="badge bg-secondary" th:text="${c.status}"></span></td>
+                        <td><span th:if="${c.voiceAttached}" title="Has a voice note">🎤</span></td>
+                        <td class="pe-3 text-end">
+                            <button class="btn btn-sm btn-outline-primary fw-semibold" type="button"
+                                    data-bs-toggle="collapse" th:data-bs-target="'#details-' + ${c.id}" aria-expanded="false">
+                                Open &#9660;
+                            </button>
+                        </td>
+                    </tr>
+
+                    <!-- Expanded details + edit form -->
+                    <tr class="detail-row border-0">
+                        <td colspan="8" class="p-0 border-0">
+                            <div class="collapse bg-light p-4 border-bottom" th:id="'details-' + ${c.id}">
+                                <div class="row g-4">
+                                    <div class="col-lg-6">
+                                        <h6 class="fw-bold text-primary mb-2">Full Incident Description</h6>
+                                        <p class="mb-3 bg-white p-3 rounded border text-dark" style="white-space: pre-wrap;" th:text="${c.description}"></p>
+
+                                        <h6 class="fw-bold text-secondary mb-2">🎤 Voice Note</h6>
+                                        <div th:if="${c.voiceAttached}">
+                                            <audio controls preload="none" class="w-100" th:src="@{/admin/complaints/{id}/voice(id=${c.id})}"></audio>
+                                        </div>
+                                        <p th:unless="${c.voiceAttached}" class="text-muted small mb-0">No voice note attached to this report.</p>
+                                    </div>
+
+                                    <div class="col-lg-3">
+                                        <h6 class="fw-bold text-secondary mb-2">Report Info</h6>
+                                        <ul class="list-group list-group-flush small bg-white border rounded">
+                                            <li class="list-group-item d-flex justify-content-between">
+                                                <span class="text-muted">Reporter:</span>
+                                                <strong th:text="${c.reporterPhone != null && !c.reporterPhone.isBlank() ? c.reporterPhone : 'Anonymous'}"></strong>
+                                            </li>
+                                            <li class="list-group-item d-flex justify-content-between">
+                                                <span class="text-muted">Channel:</span><strong th:text="${c.channel}"></strong>
+                                            </li>
+                                            <li class="list-group-item d-flex justify-content-between">
+                                                <span class="text-muted">Confirmations:</span><strong th:text="${c.confirmations}"></strong>
+                                            </li>
+                                            <li class="list-group-item d-flex justify-content-between">
+                                                <span class="text-muted">Logged:</span>
+                                                <strong th:text="${#temporals.format(c.createdAt, 'dd MMM yyyy HH:mm')}"></strong>
+                                            </li>
+                                            <li class="list-group-item d-flex justify-content-between" th:if="${c.resolvedAt != null}">
+                                                <span class="text-muted">Resolved:</span>
+                                                <strong th:text="${#temporals.format(c.resolvedAt, 'dd MMM yyyy HH:mm')}"></strong>
+                                            </li>
+                                        </ul>
+                                    </div>
+
+                                    <div class="col-lg-3">
+                                        <h6 class="fw-bold text-danger mb-2">✏️ Edit Report</h6>
+                                        <form th:action="@{/admin/complaints/{id}/update(id=${c.id})}" method="post" class="d-grid gap-2">
+                                            <div>
+                                                <label class="form-label small fw-bold mb-1">Urgency level</label>
+                                                <select name="urgency" class="form-select form-select-sm">
+                                                    <option th:each="u : ${T(gm.ndema.model.Enums.Urgency).values()}"
+                                                            th:value="${u}" th:text="${u}" th:selected="${u == c.urgencyLevel}"></option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label class="form-label small fw-bold mb-1">Status</label>
+                                                <select name="status" class="form-select form-select-sm">
+                                                    <option th:each="st : ${T(gm.ndema.model.Enums.Status).values()}"
+                                                            th:value="${st}" th:text="${st}" th:selected="${st == c.status}"></option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label class="form-label small fw-bold mb-1">Officer note (shown to the citizen)</label>
+                                                <textarea name="adminNotes" class="form-control form-control-sm" rows="2" maxlength="1000"
+                                                          th:text="${c.adminNotes}"></textarea>
+                                            </div>
+                                            <button type="submit" class="btn btn-sm btn-primary fw-semibold">Save changes</button>
+                                            <small class="text-muted">Changes are recorded in the audit history under your name.</small>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                </th:block>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div th:if="${#lists.isEmpty(groups)}" class="card border-0 shadow-sm rounded-4 p-5 text-center text-muted">
+        No complaints recorded in the system yet.
+    </div>
+    <div id="noMatches" class="card border-0 shadow-sm rounded-4 p-4 text-center text-muted d-none">No reports match your search.</div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    function toggleGroup(box) {
+        document.querySelectorAll('.row-check[data-group="' + box.dataset.group + '"]').forEach(c => {
+            if (c.closest('tr').style.display !== 'none') c.checked = box.checked;
+        });
+    }
+
+    function filterTable() {
+        const q = document.getElementById('searchInput').value.toLowerCase().trim();
+        const cat = document.getElementById('categoryFilter').value;
+        let anyVisible = false;
+
+        document.querySelectorAll('.group-card').forEach(card => {
+            let visibleInGroup = 0;
+            card.querySelectorAll('tr.complaint-row').forEach(row => {
+                const detail = row.nextElementSibling;
+                const text = (row.getAttribute('data-search') || '').toLowerCase();
+                const show = (q === '' || text.includes(q)) && (cat === '' || row.getAttribute('data-category') === cat);
+                row.style.display = show ? '' : 'none';
+                if (detail) {
+                    detail.style.display = show ? '' : 'none';
+                    if (!show) {
+                        const c = detail.querySelector('.collapse');
+                        if (c) c.classList.remove('show');
+                    }
+                }
+                if (show) visibleInGroup++;
+            });
+            card.style.display = visibleInGroup > 0 ? '' : 'none';
+            if (visibleInGroup > 0) anyVisible = true;
+        });
+        document.getElementById('noMatches').classList.toggle('d-none', anyVisible);
+    }
+</script>
+</body>
+</html>

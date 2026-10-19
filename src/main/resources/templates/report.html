@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ndema - Submit Incident / Request Aid</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light py-5">
+<div class="container" style="max-width: 650px;">
+
+    <!-- Top Navigation -->
+    <div class="d-flex align-items-center justify-content-between mb-4">
+        <a href="/" class="btn btn-outline-secondary">&larr; Back to Home</a>
+        <h3 class="mb-0 text-primary fw-bold">Ndema</h3>
+    </div>
+
+    <div class="card shadow border-0 rounded-4 p-4">
+        <h4 class="mb-1 text-dark fw-bold">Submit Incident / Request Aid</h4>
+        <p class="text-muted small mb-4">Tap a visual icon below or type your issue to notify municipal response teams.</p>
+
+        <div th:if="${error}" class="alert alert-danger py-2" th:text="${error}"></div>
+
+        <form id="reportForm" th:action="@{/report}" th:object="${complaint}" method="post" enctype="multipart/form-data">
+
+            <!-- Illiterate-Friendly Visual Emoji Selector -->
+            <label class="form-label fw-bold">1. Tap Category Icon</label>
+            <input type="hidden" th:field="*{category}" id="selectedCategory">
+            <div class="row g-2 mb-4 text-center">
+                <div class="col-4">
+                    <button type="button" class="btn btn-outline-primary w-100 py-3 rounded-4 cat-btn" data-cat="FLOODING_HAZARD" onclick="setCategory('FLOODING_HAZARD', this)">
+                        <span class="display-5 d-block">🌊</span>
+                        <small class="fw-bold">Flooding</small>
+                    </button>
+                </div>
+                <div class="col-4">
+                    <button type="button" class="btn btn-outline-warning w-100 py-3 rounded-4 cat-btn" data-cat="ELECTRICITY_STREETLIGHT" onclick="setCategory('ELECTRICITY_STREETLIGHT', this)">
+                        <span class="display-5 d-block">🔥</span>
+                        <small class="fw-bold">Power / Fire</small>
+                    </button>
+                </div>
+                <div class="col-4">
+                    <button type="button" class="btn btn-outline-info w-100 py-3 rounded-4 cat-btn" data-cat="WATER_SUPPLY" onclick="setCategory('WATER_SUPPLY', this)">
+                        <span class="display-5 d-block">🚰</span>
+                        <small class="fw-bold">Water Pipe</small>
+                    </button>
+                </div>
+                <div class="col-4">
+                    <button type="button" class="btn btn-outline-success w-100 py-3 rounded-4 cat-btn" data-cat="WASTE_SANITATION" onclick="setCategory('WASTE_SANITATION', this)">
+                        <span class="display-5 d-block">🗑️</span>
+                        <small class="fw-bold">Garbage</small>
+                    </button>
+                </div>
+                <div class="col-4">
+                    <button type="button" class="btn btn-outline-danger w-100 py-3 rounded-4 cat-btn" data-cat="UNSAFE_PUBLIC_SPACE" onclick="setCategory('UNSAFE_PUBLIC_SPACE', this)">
+                        <span class="display-5 d-block">🚨</span>
+                        <small class="fw-bold">Danger / Gun</small>
+                    </button>
+                </div>
+                <div class="col-4">
+                    <button type="button" class="btn btn-outline-secondary w-100 py-3 rounded-4 cat-btn" data-cat="ROADS_DRAINAGE" onclick="setCategory('ROADS_DRAINAGE', this)">
+                        <span class="display-5 d-block">🛣️</span>
+                        <small class="fw-bold">Road / Pothole</small>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Voice Note Recording Feature (real microphone recording) -->
+            <div class="card p-3 bg-white border mb-3 text-center rounded-4">
+                <span class="fw-bold text-dark mb-1">🎤 Record Voice Note (Illiterate-Friendly)</span>
+                <small class="text-muted mb-2 d-block">Tap to state the location and details by voice (up to 2 minutes). Only officers can listen to it.</small>
+                <div class="d-flex justify-content-center gap-2 flex-wrap">
+                    <button type="button" id="recordBtn" class="btn btn-outline-danger fw-bold rounded-pill px-4" onclick="toggleRecording()">🎙️ Start Recording</button>
+                    <button type="button" id="discardBtn" class="btn btn-outline-secondary rounded-pill px-3 d-none" onclick="discardRecording()">Delete</button>
+                </div>
+                <small id="recordStatus" class="mt-2 fw-bold d-none"></small>
+                <audio id="preview" class="mt-2 w-100 d-none" controls></audio>
+                <input type="file" name="voiceNote" id="voiceInput" class="d-none" accept="audio/*">
+            </div>
+
+            <!-- Dynamic & Custom LGA Input -->
+            <div class="mb-3">
+                <label class="form-label fw-bold">2. Select or Type City / LGA</label>
+                <input class="form-control form-control-lg" list="lgaOptions" th:field="*{lga}" placeholder="Pick LGA or type new city..." required>
+                <datalist id="lgaOptions">
+                    <option th:each="lga : ${lgas}" th:value="${lga}" th:text="${lga}"></option>
+                </datalist>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label fw-bold">3. Report Title</label>
+                <input type="text" th:field="*{title}" maxlength="200" class="form-control form-control-lg" placeholder="e.g. Burst water main near market" required>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label fw-bold">4. Detailed Description</label>
+                <textarea th:field="*{description}" class="form-control" rows="3" maxlength="1000" placeholder="Describe landmark, hazards, or specific safety details..." required></textarea>
+            </div>
+
+            <div class="mb-4">
+                <label class="form-label fw-bold">5. Phone Number (Optional for SMS updates)</label>
+                <input type="text" th:field="*{reporterPhone}" class="form-control form-control-lg" placeholder="e.g. 2207000000">
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100 btn-lg fw-bold py-3 shadow-sm">Submit Incident Report</button>
+        </form>
+    </div>
+</div>
+
+<script>
+    const MAX_SECONDS = 120;
+    // Only one recording can exist at a time. "current" is the live session (or null).
+    let current = null, starting = false, stopping = false, previewUrl = null;
+
+    function setCategory(cat, btn) {
+        document.getElementById('selectedCategory').value = cat;
+        document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active', 'btn-dark'));
+        if (btn) btn.classList.add('active', 'btn-dark');
+    }
+
+    // Restore the chosen category after a validation error
+    (function () {
+        const v = document.getElementById('selectedCategory').value;
+        if (v) setCategory(v, document.querySelector('.cat-btn[data-cat="' + v + '"]'));
+    })();
+
+    document.getElementById('reportForm').addEventListener('submit', function (e) {
+        if (!document.getElementById('selectedCategory').value) {
+            e.preventDefault();
+            alert('Please tap a category icon first.');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        } else if (current || starting || stopping) {
+            e.preventDefault();
+            alert('Please stop the recording before submitting.');
+        }
+    });
+
+    function showStatus(text, ok) {
+        const el = document.getElementById('recordStatus');
+        el.textContent = text;
+        el.className = 'mt-2 fw-bold ' + (ok ? 'text-success' : 'text-danger');
+    }
+
+    function setRecordButton(text, recording, disabled) {
+        const btn = document.getElementById('recordBtn');
+        btn.textContent = text;
+        btn.disabled = !!disabled;
+        btn.classList.toggle('btn-danger', recording);
+        btn.classList.toggle('btn-outline-danger', !recording);
+    }
+
+    function fmt(sec) {
+        return Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0');
+    }
+
+    async function toggleRecording() {
+        if (starting || stopping) return;          // ignore taps while the mic is starting or stopping
+        if (current) { stopRecording(); return; }
+
+        if (!navigator.mediaDevices || !window.MediaRecorder) {
+            showStatus('Voice recording is not supported in this browser. Please type your report instead.', false);
+            return;
+        }
+        starting = true;
+        setRecordButton('Starting microphone...', false, true);
+        let stream;
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        } catch (err) {
+            starting = false;
+            setRecordButton('🎙️ Start Recording', false, false);
+            showStatus('Microphone access was blocked. Allow the microphone, or type your report instead.', false);
+            return;
+        }
+
+        discardRecording();
+        const session = { stream: stream, recorder: new MediaRecorder(stream), chunks: [], seconds: 0, timer: null };
+        session.recorder.ondataavailable = e => { if (e.data && e.data.size > 0) session.chunks.push(e.data); };
+        session.recorder.onstop = () => finishRecording(session);
+        current = session;
+        session.recorder.start();
+        starting = false;
+
+        setRecordButton('⏹️ Stop Recording (0:00)', true, false);
+        showStatus('Recording... tap Stop when you are done.', true);
+        session.timer = setInterval(() => {
+            session.seconds++;
+            if (current === session) setRecordButton('⏹️ Stop Recording (' + fmt(session.seconds) + ')', true, false);
+            if (session.seconds >= MAX_SECONDS) stopRecording();
+        }, 1000);
+    }
+
+    function stopRecording() {
+        const session = current;
+        if (!session || stopping) return;
+        stopping = true;
+        current = null;
+        clearInterval(session.timer);
+        setRecordButton('Saving...', false, true);
+        if (session.recorder.state !== 'inactive') {
+            session.recorder.stop();               // finishRecording() runs from onstop
+        } else {
+            finishRecording(session);
+        }
+    }
+
+    function finishRecording(session) {
+        clearInterval(session.timer);
+        session.stream.getTracks().forEach(t => t.stop());   // release the microphone
+        stopping = false;
+        setRecordButton('🎙️ Record Again', false, false);
+
+        const type = session.recorder.mimeType || 'audio/webm';
+        const blob = new Blob(session.chunks, { type: type });
+        if (blob.size === 0) {
+            showStatus('Nothing was recorded. Please try again.', false);
+            return;
+        }
+        const ext = type.includes('mp4') ? 'm4a' : (type.includes('ogg') ? 'ogg' : 'webm');
+        const file = new File([blob], 'voice-note.' + ext, { type: type });
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        document.getElementById('voiceInput').files = dt.files;
+
+        previewUrl = URL.createObjectURL(blob);
+        const audio = document.getElementById('preview');
+        audio.src = previewUrl;
+        audio.classList.remove('d-none');
+        document.getElementById('discardBtn').classList.remove('d-none');
+        showStatus('Voice note attached ✓ (' + Math.round(blob.size / 1024) + ' KB)', true);
+    }
+
+    // Leaving the page must never leave the microphone running
+    window.addEventListener('pagehide', () => { if (current) stopRecording(); });
+
+    function discardRecording() {
+        document.getElementById('voiceInput').value = '';
+        const audio = document.getElementById('preview');
+        audio.pause();
+        audio.removeAttribute('src');
+        audio.classList.add('d-none');
+        document.getElementById('discardBtn').classList.add('d-none');
+        document.getElementById('recordStatus').className = 'mt-2 fw-bold d-none';
+        if (previewUrl) { URL.revokeObjectURL(previewUrl); previewUrl = null; }
+    }
+</script>
+</body>
+</html>
