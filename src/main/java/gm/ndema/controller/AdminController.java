@@ -32,17 +32,20 @@ public class AdminController {
     private final AdminUserRepository adminUserRepository;
     private final ComplaintVersionRepository versionRepository;
     private final VoiceNoteRepository voiceNoteRepository;
+    private final InstitutionRepository institutionRepository;
 
     public AdminController(ComplaintRepository complaintRepository,
                            AuditLogRepository auditLogRepository,
                            AdminUserRepository adminUserRepository,
                            ComplaintVersionRepository versionRepository,
-                           VoiceNoteRepository voiceNoteRepository) {
+                           VoiceNoteRepository voiceNoteRepository,
+                           InstitutionRepository institutionRepository) {
         this.complaintRepository = complaintRepository;
         this.auditLogRepository = auditLogRepository;
         this.adminUserRepository = adminUserRepository;
         this.versionRepository = versionRepository;
         this.voiceNoteRepository = voiceNoteRepository;
+        this.institutionRepository = institutionRepository;
     }
 
     // The session only stores the admin's id; the admin is re-loaded on every request,
@@ -126,6 +129,7 @@ public class AdminController {
         model.addAttribute("inProgressCount", complaints.stream().filter(c -> c.getStatus() == Enums.Status.IN_PROGRESS).count());
         model.addAttribute("resolvedCount", complaints.stream().filter(c -> c.getStatus() == Enums.Status.RESOLVED).count());
         model.addAttribute("sort", sort);
+        model.addAttribute("institutions", institutionRepository.findAllByOrderByShortNameAsc());
         model.addAttribute("currentAdmin", admin);
         return "admin/dashboard";
     }
@@ -159,6 +163,9 @@ public class AdminController {
                                   @RequestParam(required = false) Enums.Urgency urgency,
                                   @RequestParam(required = false) Enums.Status status,
                                   @RequestParam(required = false) String adminNotes,
+                                  @RequestParam(required = false) Long institutionId,
+                                  @RequestParam(required = false) String newInstitutionName,
+                                  @RequestParam(required = false) String newInstitutionShort,
                                   HttpSession session, RedirectAttributes redirect) {
         AdminUser admin = currentAdmin(session);
         if (admin == null) return "redirect:/admin/login";
@@ -168,7 +175,9 @@ public class AdminController {
             redirect.addFlashAttribute("err", "Report not found.");
             return "redirect:/admin/dashboard";
         }
-        boolean changed = applyChange(admin, complaint, urgency, status, adminNotes, LocalDateTime.now());
+        LocalDateTime now = LocalDateTime.now();
+        Institution institution = resolveInstitution(admin, institutionId, newInstitutionName, newInstitutionShort, now);
+        boolean changed = applyChange(admin, complaint, urgency, status, adminNotes, institution, now);
         redirect.addFlashAttribute(changed ? "msg" : "err",
                 changed ? "Report " + complaint.getTrackingCode() + " updated." : "No changes were made.");
         return "redirect:/admin/dashboard";
@@ -180,6 +189,7 @@ public class AdminController {
     public String bulkUpdate(@RequestParam(required = false) List<Long> ids,
                              @RequestParam(required = false) Enums.Urgency urgency,
                              @RequestParam(required = false) Enums.Status status,
+                             @RequestParam(required = false) Long institutionId,
                              HttpSession session, RedirectAttributes redirect) {
         AdminUser admin = currentAdmin(session);
         if (admin == null) return "redirect:/admin/login";
@@ -188,15 +198,16 @@ public class AdminController {
             redirect.addFlashAttribute("err", "Tick at least one report first.");
             return "redirect:/admin/dashboard";
         }
-        if (urgency == null && status == null) {
-            redirect.addFlashAttribute("err", "Choose a new urgency and/or status to apply.");
+        if (urgency == null && status == null && institutionId == null) {
+            redirect.addFlashAttribute("err", "Choose a new urgency, status and/or institution to apply.");
             return "redirect:/admin/dashboard";
         }
         LocalDateTime now = LocalDateTime.now();
+        Institution institution = resolveInstitution(admin, institutionId, null, null, now);
         int updated = 0;
         for (Long id : new LinkedHashSet<>(ids)) {
             Complaint complaint = complaintRepository.findById(id).orElse(null);
-            if (complaint != null && applyChange(admin, complaint, urgency, status, null, now)) {
+            if (complaint != null && applyChange(admin, complaint, urgency, status, null, institution, now)) {
                 updated++;
             }
         }
@@ -206,16 +217,18 @@ public class AdminController {
 
     /** Applies the edits, writes a version snapshot, and one audit-log line per changed field. */
     private boolean applyChange(AdminUser admin, Complaint c, Enums.Urgency newUrgency,
-                                Enums.Status newStatus, String notes, LocalDateTime when) {
+                                Enums.Status newStatus, String notes, Institution newInstitution, LocalDateTime when) {
         boolean urgencyChanged = newUrgency != null && newUrgency != c.getUrgencyLevel();
         boolean statusChanged = newStatus != null && newStatus != c.getStatus();
+        boolean institutionChanged = newInstitution != null
+                && (c.getInstitution() == null || !Objects.equals(c.getInstitution().getId(), newInstitution.getId()));
         String cleanNotes = notes == null ? null : notes.trim();
         if (cleanNotes != null && cleanNotes.length() > 1000) {
             cleanNotes = cleanNotes.substring(0, 1000);
         }
         boolean notesChanged = cleanNotes != null && !cleanNotes.isEmpty() && !cleanNotes.equals(c.getAdminNotes());
 
-        if (!urgencyChanged && !statusChanged && !notesChanged) {
+        if (!urgencyChanged && !statusChanged && !institutionChanged && !notesChanged) {
             return false;
         }
 
@@ -249,6 +262,11 @@ public class AdminController {
             }
             logAction(admin.getUsername(), "STATUS_CHANGE", who + " status" + at + " from " + old + " to " + newStatus, when);
         }
+        if (institutionChanged) {
+            String old = c.getInstitution() == null ? "UNASSIGNED" : c.getInstitution().getShortName();
+            c.setInstitution(newInstitution);
+            logAction(admin.getUsername(), "INSTITUTION_CHANGE", who + " institution" + at + " from " + old + " to " + newInstitution.getShortName(), when);
+        }
         if (notesChanged) {
             c.setAdminNotes(cleanNotes);
             logAction(admin.getUsername(), "NOTES_CHANGE", who + " notes" + at + " (officer note updated)", when);
@@ -256,6 +274,50 @@ public class AdminController {
         c.setUpdatedAt(when);
         complaintRepository.save(c);
         return true;
+    }
+
+    /**
+     * Picks the institution for an edit: a brand-new one when a name is typed (reusing an existing one
+     * with the same short name), otherwise the existing one chosen by id. Returns null for "no change".
+     */
+    private Institution resolveInstitution(AdminUser admin, Long institutionId, String newName,
+                                           String newShort, LocalDateTime when) {
+        String name = newName == null ? "" : newName.trim();
+        if (!name.isEmpty()) {
+            if (name.length() > 100) {
+                name = name.substring(0, 100);
+            }
+            String shortName = newShort == null ? "" : newShort.trim().toUpperCase(Locale.ROOT);
+            if (shortName.isEmpty()) {
+                shortName = deriveShortName(name);
+            }
+            if (shortName.length() > 12) {
+                shortName = shortName.substring(0, 12);
+            }
+            Optional<Institution> existing = institutionRepository.findByShortNameIgnoreCase(shortName);
+            if (existing.isPresent()) {
+                return existing.get();
+            }
+            Institution created = institutionRepository.save(new Institution(name, shortName, "", ""));
+            logAction(admin.getUsername(), "ADD_INSTITUTION", "Admin \"" + admin.getUsername() + "\" added institution \""
+                    + name + "\" (" + shortName + ") on " + now(when), when);
+            return created;
+        }
+        if (institutionId != null) {
+            return institutionRepository.findById(institutionId).orElse(null);
+        }
+        return null;
+    }
+
+    // "Ministry of Works" -> "MOW"
+    private static String deriveShortName(String name) {
+        StringBuilder sb = new StringBuilder();
+        for (String word : name.split("\\s+")) {
+            if (!word.isEmpty() && Character.isLetterOrDigit(word.charAt(0))) {
+                sb.append(Character.toUpperCase(word.charAt(0)));
+            }
+        }
+        return sb.length() == 0 ? "ORG" : sb.toString();
     }
 
     // ---------------------------------------------------------------- voice notes (admins only)
