@@ -54,7 +54,7 @@ public class UssdController {
 
         if ("1".equals(inputs[0])) {
             if (inputs.length == 1) {
-                return "CON Category:\n1. Roads/Drains\n2. Waste\n3. Water\n4. Power/Light\n5. Unsafe Area\n6. Flooding";
+                return "CON Category:\n1. Roads/Drains\n2. Waste\n3. Water\n4. Electricity\n5. Public Safety\n6. Flooding\n7. Health\n8. Education\n9. Agriculture\n0. Other";
             }
             if (inputs.length == 2) {
                 return "CON Area:\n1. Banjul\n2. Kanifing\n3. Brikama\n4. Other";
@@ -97,8 +97,11 @@ public class UssdController {
             case "2" -> Enums.Category.WASTE_SANITATION;
             case "3" -> Enums.Category.WATER_SUPPLY;
             case "4" -> Enums.Category.ELECTRICITY_STREETLIGHT;
-            case "5" -> Enums.Category.UNSAFE_PUBLIC_SPACE;
+            case "5" -> Enums.Category.PUBLIC_SAFETY;
             case "6" -> Enums.Category.FLOODING_HAZARD;
+            case "7" -> Enums.Category.HEALTHCARE;
+            case "8" -> Enums.Category.EDUCATION;
+            case "9" -> Enums.Category.AGRICULTURE;
             default -> Enums.Category.OTHER;
         };
     }
