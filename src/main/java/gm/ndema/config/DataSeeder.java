@@ -40,6 +40,12 @@ public class DataSeeder implements CommandLineRunner {
             Institution nawec = institutionRepository.save(new Institution("National Water and Electricity Company", "NAWEC", "customercare@nawec.gm", "+220 168"));
             Institution ndma = institutionRepository.save(new Institution("National Disaster Management Agency", "NDMA", "info@ndma.gm", "+220 4370002"));
 
+            // Institutions for the newer categories (admins can edit or add more from the dashboard)
+            institutionRepository.save(new Institution("Ministry of Agriculture", "MOA", "", ""));
+            institutionRepository.save(new Institution("Ministry of Basic and Secondary Education", "MOBSE", "", ""));
+            institutionRepository.save(new Institution("Ministry of Health", "MOH", "", ""));
+            institutionRepository.save(new Institution("Gambia Police Force", "GPF", "", ""));
+
             if (complaintRepository.count() == 0) {
                 seedComplaints(kmc, bcc, nawec, ndma);
             }
