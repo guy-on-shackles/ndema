@@ -109,6 +109,10 @@
                     <option value="">Status: no change</option>
                     <option th:each="st : ${T(gm.ndema.model.Enums.Status).values()}" th:value="${st}" th:text="${'Set ' + st}"></option>
                 </select>
+                <select name="institutionId" class="form-select form-select-sm w-auto">
+                    <option value="">Institution: no change</option>
+                    <option th:each="i : ${institutions}" th:value="${i.id}" th:text="${'Assign to ' + i.shortName}"></option>
+                </select>
                 <button type="submit" class="btn btn-sm btn-warning fw-semibold">Apply to ticked</button>
             </form>
         </div>
@@ -219,6 +223,21 @@
                                                     <option th:each="st : ${T(gm.ndema.model.Enums.Status).values()}"
                                                             th:value="${st}" th:text="${st}" th:selected="${st == c.status}"></option>
                                                 </select>
+                                            </div>
+                                            <div>
+                                                <label class="form-label small fw-bold mb-1">Assigned institution</label>
+                                                <select name="institutionId" class="form-select form-select-sm">
+                                                    <option value="" th:selected="${c.institution == null}">Unassigned</option>
+                                                    <option th:each="i : ${institutions}" th:value="${i.id}"
+                                                            th:text="${i.shortName + ' - ' + i.name}"
+                                                            th:selected="${c.institution != null and c.institution.id == i.id}"></option>
+                                                </select>
+                                                <details class="small mt-1">
+                                                    <summary class="text-primary" style="cursor: pointer;">+ New institution</summary>
+                                                    <input type="text" name="newInstitutionName" class="form-control form-control-sm mt-1" maxlength="100" placeholder="Full name, e.g. Ministry of Works">
+                                                    <input type="text" name="newInstitutionShort" class="form-control form-control-sm mt-1" maxlength="12" placeholder="Short name (optional)">
+                                                    <div class="text-muted mt-1">If a name is filled in, the report is assigned to this institution.</div>
+                                                </details>
                                             </div>
                                             <div>
                                                 <label class="form-label small fw-bold mb-1">Officer note (shown to the citizen)</label>
