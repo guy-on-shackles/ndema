@@ -120,6 +120,7 @@
                     <th class="ps-3" style="width: 40px;"></th>
                     <th>Urgency</th>
                     <th>Tracking Code</th>
+                    <th>Area / City</th>
                     <th>Title</th>
                     <th>Institution</th>
                     <th>Status</th>
@@ -143,6 +144,7 @@
                             <span th:if="${c.urgencyOverridden}" class="badge bg-light text-dark border ms-1" title="Urgency set manually by an admin">✎</span>
                         </td>
                         <td class="fw-bold text-primary text-nowrap" th:text="${c.trackingCode}"></td>
+                        <td class="fw-semibold text-nowrap">📍 <span th:text="${c.lga != null and !#strings.isEmpty(c.lga) ? c.lga : 'Not given'}"></span></td>
                         <td class="fw-semibold text-dark" style="max-width: 260px;" th:text="${c.title}"></td>
                         <td><span class="badge bg-light text-dark border" th:text="${c.institution != null ? c.institution.shortName : 'Unassigned'}"></span></td>
                         <td><span class="badge bg-secondary" th:text="${c.status}"></span></td>
@@ -157,7 +159,7 @@
 
                     <!-- Expanded details + edit form -->
                     <tr class="detail-row border-0">
-                        <td colspan="8" class="p-0 border-0">
+                        <td colspan="9" class="p-0 border-0">
                             <div class="collapse bg-light p-4 border-bottom" th:id="'details-' + ${c.id}">
                                 <div class="row g-4">
                                     <div class="col-lg-6">
@@ -174,6 +176,12 @@
                                     <div class="col-lg-3">
                                         <h6 class="fw-bold text-secondary mb-2">Report Info</h6>
                                         <ul class="list-group list-group-flush small bg-white border rounded">
+                                            <li class="list-group-item d-flex justify-content-between">
+                                                <span class="text-muted">Area / City:</span><strong th:text="${c.lga}"></strong>
+                                            </li>
+                                            <li class="list-group-item d-flex justify-content-between">
+                                                <span class="text-muted">Category:</span><strong th:text="${c.category}"></strong>
+                                            </li>
                                             <li class="list-group-item d-flex justify-content-between">
                                                 <span class="text-muted">Reporter:</span>
                                                 <strong th:text="${c.reporterPhone != null && !c.reporterPhone.isBlank() ? c.reporterPhone : 'Anonymous'}"></strong>
