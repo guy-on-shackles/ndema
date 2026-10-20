@@ -16,19 +16,42 @@ public class RoutingService {
 
     public Institution route(Enums.Category category, String lga) {
         if (category == Enums.Category.ELECTRICITY_STREETLIGHT || category == Enums.Category.WATER_SUPPLY) {
-            return institutionRepository.findByShortName("NAWEC").orElse(null);
+            return find("NAWEC");
         }
         if (category == Enums.Category.FLOODING_HAZARD) {
-            return institutionRepository.findByShortName("NDMA").orElse(null);
+            return find("NDMA");
         }
 
-        // Municipal council routing based on LGA string check
+        // National-level categories go to their ministry or agency; if that institution is not in the
+        // system (an admin may have removed or renamed it), fall back to the municipal council.
+        Institution national = null;
+        if (category == Enums.Category.AGRICULTURE) {
+            national = find("MOA");
+        } else if (category == Enums.Category.EDUCATION) {
+            national = find("MOBSE");
+        } else if (category == Enums.Category.HEALTHCARE) {
+            national = find("MOH");
+        } else if (category == Enums.Category.PUBLIC_SAFETY) {
+            national = find("GPF");
+        }
+        if (national != null) {
+            return national;
+        }
+
+        return council(lga);
+    }
+
+    // Municipal council routing based on the LGA text
+    private Institution council(String lga) {
         String upperLga = (lga != null) ? lga.toUpperCase() : "";
         if (upperLga.contains("BANJUL")) {
-            return institutionRepository.findByShortName("BCC").orElse(null);
+            return find("BCC");
         }
-
         // Default to KMC for Kanifing, Sukuta, Brikama, Serrekunda, etc.
-        return institutionRepository.findByShortName("KMC").orElse(null);
+        return find("KMC");
+    }
+
+    private Institution find(String shortName) {
+        return institutionRepository.findByShortName(shortName).orElse(null);
     }
 }
