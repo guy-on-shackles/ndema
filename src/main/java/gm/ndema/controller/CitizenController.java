@@ -66,15 +66,29 @@ public class CitizenController {
     public String submitReport(@ModelAttribute("complaint") Complaint complaint,
                                @RequestParam(value = "voiceNote", required = false) MultipartFile voiceNote,
                                Model model) {
+        // A valid voice note is read first: when one is attached, the written fields become optional.
+        byte[] voiceBytes = null;
+        String voiceType = null;
+        if (voiceNote != null && !voiceNote.isEmpty() && voiceNote.getSize() <= MAX_VOICE_BYTES) {
+            String type = baseContentType(voiceNote.getContentType());
+            if (type != null) {
+                try {
+                    voiceBytes = voiceNote.getBytes();
+                    voiceType = type;
+                } catch (IOException ignored) {
+                    voiceBytes = null;
+                }
+            }
+        }
+        boolean hasVoice = voiceBytes != null && voiceBytes.length > 0;
+
         String title = complaint.getTitle() == null ? "" : complaint.getTitle().trim();
         String description = complaint.getDescription() == null ? "" : complaint.getDescription().trim();
         String lga = complaint.getLga() == null ? "" : complaint.getLga().trim().toUpperCase(Locale.ROOT);
 
         String error = null;
-        if (complaint.getCategory() == null) {
-            error = "Please tap a category icon.";
-        } else if (title.isEmpty() || description.isEmpty() || lga.isEmpty()) {
-            error = "Please fill in the area, title and description.";
+        if (!hasVoice && (complaint.getCategory() == null || title.isEmpty() || description.isEmpty() || lga.isEmpty())) {
+            error = "Please record a voice note, or tap a category and fill in the area, title and description.";
         } else if (title.length() > 200) {
             error = "Title is too long (max 200 characters).";
         } else if (description.length() > 1000) {
@@ -88,13 +102,27 @@ public class CitizenController {
             return "report";
         }
 
+        // Fill the gaps for a voice-only report
+        if (complaint.getCategory() == null) {
+            complaint.setCategory(Enums.Category.OTHER);
+        }
+        if (title.isEmpty()) {
+            title = "Voice report";
+        }
+        if (description.isEmpty()) {
+            description = "Voice note only. Please listen to the attached recording.";
+        }
+        if (lga.isEmpty()) {
+            lga = "NOT GIVEN";
+        }
+
         complaint.setTitle(title);
         complaint.setDescription(description);
         complaint.setLga(lga);
         String phone = complaint.getReporterPhone() == null ? "" : complaint.getReporterPhone().trim();
         complaint.setReporterPhone(phone.length() > 30 ? phone.substring(0, 30) : phone);
 
-        // Automatically route to appropriate institution (KMC, BCC, NAWEC, NDMA)
+        // Automatically route to the appropriate institution
         complaint.setInstitution(routingService.route(complaint.getCategory(), lga));
 
         // Calculate urgency score and set status & channel
@@ -111,17 +139,10 @@ public class CitizenController {
         String code = String.format("GM-%d-%06d", Year.now().getValue(), saved.getId());
         saved.setTrackingCode(code);
 
-        // Optional voice note (stored separately; only admins can play it back)
-        if (voiceNote != null && !voiceNote.isEmpty() && voiceNote.getSize() <= MAX_VOICE_BYTES) {
-            String type = baseContentType(voiceNote.getContentType());
-            if (type != null) {
-                try {
-                    voiceNoteRepository.save(new VoiceNote(saved.getId(), type, voiceNote.getBytes()));
-                    saved.setVoiceAttached(true);
-                } catch (IOException ignored) {
-                    // report is still saved without the voice note
-                }
-            }
+        // Voice note is stored separately; only admins can play it back
+        if (hasVoice) {
+            voiceNoteRepository.save(new VoiceNote(saved.getId(), voiceType, voiceBytes));
+            saved.setVoiceAttached(true);
         }
         complaintRepository.save(saved);
 
