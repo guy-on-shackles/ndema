@@ -31,6 +31,7 @@ public class UrgencyService {
 
         // 2. Base category risk bonus
         if (complaint.getCategory() == Enums.Category.UNSAFE_PUBLIC_SPACE ||
+                complaint.getCategory() == Enums.Category.PUBLIC_SAFETY ||
                 complaint.getCategory() == Enums.Category.FLOODING_HAZARD ||
                 complaint.getCategory() == Enums.Category.ELECTRICITY_STREETLIGHT) {
             score += 15;
