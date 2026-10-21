@@ -18,6 +18,11 @@ public class AdminUser {
     private String accessCode;
     private boolean isSuperAdmin;
 
+    // The institution this officer works for. Super admins have none and see every institution.
+    @ManyToOne
+    @JoinColumn(name = "institution_id")
+    private Institution institution;
+
     public AdminUser() {}
 
     public AdminUser(String username, String fullName, String password, String accessCode, boolean isSuperAdmin) {
@@ -26,6 +31,11 @@ public class AdminUser {
         this.password = password;
         this.accessCode = accessCode;
         this.isSuperAdmin = isSuperAdmin;
+    }
+
+    public AdminUser(String username, String fullName, String password, String accessCode, boolean isSuperAdmin, Institution institution) {
+        this(username, fullName, password, accessCode, isSuperAdmin);
+        this.institution = institution;
     }
 
     // Getters and Setters
@@ -40,4 +50,6 @@ public class AdminUser {
     public void setAccessCode(String accessCode) { this.accessCode = accessCode; }
     public boolean isSuperAdmin() { return isSuperAdmin; }
     public void setSuperAdmin(boolean superAdmin) { isSuperAdmin = superAdmin; }
+    public Institution getInstitution() { return institution; }
+    public void setInstitution(Institution institution) { this.institution = institution; }
 }
