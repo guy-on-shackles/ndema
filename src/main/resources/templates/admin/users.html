@@ -40,9 +40,25 @@
                     <label class="form-label fw-semibold">Security access code</label>
                     <input type="text" name="accessCode" class="form-control" required maxlength="20">
                 </div>
+                <div class="col-12" id="instBlock">
+                    <label class="form-label fw-semibold">Institution this admin works for</label>
+                    <select name="institutionId" class="form-select" id="instSelect">
+                        <option value="">Choose an institution...</option>
+                        <option th:each="i : ${institutions}" th:value="${i.id}" th:text="${i.shortName + ' - ' + i.name}"></option>
+                    </select>
+                    <details class="mt-2">
+                        <summary class="small fw-semibold text-primary" style="cursor:pointer">+ Institution not in the list? Create it now</summary>
+                        <div class="row g-2 mt-1">
+                            <div class="col-md-8"><input type="text" name="newInstitutionName" class="form-control" maxlength="100" placeholder="Full name, e.g. Ministry of Works"></div>
+                            <div class="col-md-4"><input type="text" name="newInstitutionShort" class="form-control" maxlength="12" placeholder="Short (optional)"></div>
+                        </div>
+                        <div class="form-text">A new institution is added everywhere institutions are used. If you type one, it overrides the dropdown.</div>
+                    </details>
+                </div>
                 <div class="col-12">
                     <div class="form-check">
-                        <input class="form-check-input" type="checkbox" name="superAdmin" value="true" id="superAdminBox">
+                        <input class="form-check-input" type="checkbox" name="superAdmin" value="true" id="superAdminBox"
+                               onchange="document.getElementById('instBlock').style.display = this.checked ? 'none' : ''">
                         <label class="form-check-label" for="superAdminBox">Make this person a super admin (can add/remove admins)</label>
                     </div>
                 </div>
@@ -58,7 +74,7 @@
         <div class="table-responsive">
             <table class="table align-middle mb-0">
                 <thead class="table-dark">
-                <tr><th class="ps-4">Username</th><th>Full name</th><th>Role</th><th class="pe-4 text-end">Action</th></tr>
+                <tr><th class="ps-4">Username</th><th>Full name</th><th>Role</th><th>Institution</th><th class="pe-4 text-end">Action</th></tr>
                 </thead>
                 <tbody>
                 <tr th:each="a : ${admins}">
@@ -67,6 +83,11 @@
                     <td>
                         <span class="badge" th:classappend="${a.superAdmin ? 'bg-danger' : 'bg-secondary'}"
                               th:text="${a.superAdmin ? 'Super Admin' : 'Admin'}"></span>
+                    </td>
+                    <td>
+                        <span th:if="${a.superAdmin}" class="text-muted small">All institutions</span>
+                        <span th:unless="${a.superAdmin}" class="badge bg-info text-dark"
+                              th:text="${a.institution != null ? a.institution.shortName : 'None'}"></span>
                     </td>
                     <td class="pe-4 text-end">
                         <span th:if="${a.id == currentAdmin.id}" class="text-muted small">You</span>
