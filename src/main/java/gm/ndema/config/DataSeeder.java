@@ -54,7 +54,11 @@ public class DataSeeder implements CommandLineRunner {
         // Seed default Super Admin & Municipal Officer accounts
         if (adminUserRepository.count() == 0) {
             adminUserRepository.save(new AdminUser("main_admin", "Super Admin Officer", PasswordUtil.hash("admin123"), "9900", true));
-            adminUserRepository.save(new AdminUser("kmc_officer", "Kanifing Dispatch Officer", PasswordUtil.hash("officer123"), "1122", false));
+            // Officers only see reports assigned to their own institution
+            adminUserRepository.save(new AdminUser("kmc_officer", "Kanifing Dispatch Officer", PasswordUtil.hash("officer123"), "1122", false,
+                    institutionRepository.findByShortName("KMC").orElse(null)));
+            adminUserRepository.save(new AdminUser("nawec_officer", "NAWEC Dispatch Officer", PasswordUtil.hash("officer123"), "3344", false,
+                    institutionRepository.findByShortName("NAWEC").orElse(null)));
         }
     }
 
