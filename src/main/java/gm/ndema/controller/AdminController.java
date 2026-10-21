@@ -110,7 +110,9 @@ public class AdminController {
         AdminUser admin = currentAdmin(session);
         if (admin == null) return "redirect:/admin/login";
 
-        List<Complaint> complaints = new ArrayList<>(complaintRepository.findAll());
+        // Officers only see reports assigned to their own institution; the super admin sees everything.
+        List<Complaint> complaints = new ArrayList<>(complaintRepository.findAll().stream()
+                .filter(c -> canAccess(admin, c)).toList());
         complaints.sort(comparatorFor(sort));
 
         // Group by LGA + category. Because the list is already sorted, groups appear in order of
@@ -132,6 +134,14 @@ public class AdminController {
         model.addAttribute("institutions", institutionRepository.findAllByOrderByShortNameAsc());
         model.addAttribute("currentAdmin", admin);
         return "admin/dashboard";
+    }
+
+    /** Super admin: every report. Other admins: only reports assigned to their institution. */
+    private static boolean canAccess(AdminUser admin, Complaint c) {
+        if (admin.isSuperAdmin()) return true;
+        Institution mine = admin.getInstitution();
+        return mine != null && c.getInstitution() != null
+                && Objects.equals(mine.getId(), c.getInstitution().getId());
     }
 
     private Comparator<Complaint> comparatorFor(String sort) {
@@ -175,11 +185,17 @@ public class AdminController {
             redirect.addFlashAttribute("err", "Report not found.");
             return "redirect:/admin/dashboard";
         }
+        if (!canAccess(admin, complaint)) {
+            redirect.addFlashAttribute("err", "That report belongs to another institution.");
+            return "redirect:/admin/dashboard";
+        }
         LocalDateTime now = LocalDateTime.now();
         Institution institution = resolveInstitution(admin, institutionId, newInstitutionName, newInstitutionShort, now);
         boolean changed = applyChange(admin, complaint, urgency, status, adminNotes, institution, now);
+        String handedOver = changed && !canAccess(admin, complaint)
+                ? " It was handed over to " + complaint.getInstitution().getShortName() + " and no longer appears in your list." : "";
         redirect.addFlashAttribute(changed ? "msg" : "err",
-                changed ? "Report " + complaint.getTrackingCode() + " updated." : "No changes were made.");
+                changed ? "Report " + complaint.getTrackingCode() + " updated." + handedOver : "No changes were made.");
         return "redirect:/admin/dashboard";
     }
 
@@ -207,7 +223,8 @@ public class AdminController {
         int updated = 0;
         for (Long id : new LinkedHashSet<>(ids)) {
             Complaint complaint = complaintRepository.findById(id).orElse(null);
-            if (complaint != null && applyChange(admin, complaint, urgency, status, null, institution, now)) {
+            if (complaint != null && canAccess(admin, complaint)
+                    && applyChange(admin, complaint, urgency, status, null, institution, now)) {
                 updated++;
             }
         }
@@ -324,7 +341,12 @@ public class AdminController {
 
     @GetMapping("/complaints/{id}/voice")
     public ResponseEntity<Resource> voiceNote(@PathVariable Long id, HttpSession session) {
-        if (currentAdmin(session) == null) {
+        AdminUser admin = currentAdmin(session);
+        if (admin == null) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        Complaint owner = complaintRepository.findById(id).orElse(null);
+        if (owner == null || !canAccess(admin, owner)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
         Optional<VoiceNote> note = voiceNoteRepository.findByComplaintId(id);
@@ -361,6 +383,7 @@ public class AdminController {
             return "redirect:/admin/dashboard";
         }
         model.addAttribute("admins", adminUserRepository.findAllByOrderByIdAsc());
+        model.addAttribute("institutions", institutionRepository.findAllByOrderByShortNameAsc());
         model.addAttribute("currentAdmin", admin);
         return "admin/users";
     }
@@ -371,6 +394,9 @@ public class AdminController {
                            @RequestParam String password,
                            @RequestParam String accessCode,
                            @RequestParam(defaultValue = "false") boolean superAdmin,
+                           @RequestParam(required = false) Long institutionId,
+                           @RequestParam(required = false) String newInstitutionName,
+                           @RequestParam(required = false) String newInstitutionShort,
                            HttpSession session, RedirectAttributes redirect) {
         AdminUser admin = currentAdmin(session);
         if (admin == null) return "redirect:/admin/login";
@@ -385,9 +411,16 @@ public class AdminController {
         } else if (adminUserRepository.findByUsername(user).isPresent()) {
             redirect.addFlashAttribute("err", "Username \"" + user + "\" is already taken.");
         } else {
-            adminUserRepository.save(new AdminUser(user, fullName.trim(), PasswordUtil.hash(password), accessCode.trim(), superAdmin));
+            LocalDateTime when = LocalDateTime.now();
+            Institution institution = superAdmin ? null
+                    : resolveInstitution(admin, institutionId, newInstitutionName, newInstitutionShort, when);
+            if (!superAdmin && institution == null) {
+                redirect.addFlashAttribute("err", "Choose an institution for this admin, or type a new one.");
+                return "redirect:/admin/users";
+            }
+            adminUserRepository.save(new AdminUser(user, fullName.trim(), PasswordUtil.hash(password), accessCode.trim(), superAdmin, institution));
             logAction(admin.getUsername(), "ADD_ADMIN", "Admin \"" + admin.getUsername() + "\" added admin \"" + user + "\""
-                    + (superAdmin ? " (super admin)" : "") + " on " + now(LocalDateTime.now()));
+                    + (superAdmin ? " (super admin, all institutions)" : " for " + institution.getShortName()) + " on " + now(when), when);
             redirect.addFlashAttribute("msg", "Admin \"" + user + "\" added.");
         }
         return "redirect:/admin/users";
