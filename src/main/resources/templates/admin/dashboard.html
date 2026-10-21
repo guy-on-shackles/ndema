@@ -15,7 +15,9 @@
             <h2 class="fw-bold mb-0 text-dark">Ndema — Officer Dashboard</h2>
             <small class="text-muted">
                 Signed in as <strong th:text="${currentAdmin.fullName}"></strong>
-                <span class="badge bg-danger ms-1" th:if="${currentAdmin.superAdmin}">Super Admin</span>
+                <span class="badge bg-danger ms-1" th:if="${currentAdmin.superAdmin}">Super Admin: all institutions</span>
+                <span class="badge bg-info text-dark ms-1" th:unless="${currentAdmin.superAdmin}"
+                      th:text="${currentAdmin.institution != null ? currentAdmin.institution.shortName + ' reports only' : 'No institution assigned'}"></span>
             </small>
         </div>
         <div class="d-flex gap-2 flex-wrap">
